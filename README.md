@@ -1,5 +1,6 @@
 # PerlinX Rewards Contracts
 
+
 Allows an admin to:
 1) Add TOTALREWARDS
 2) Specify number of weeks to run for (reward eras)
