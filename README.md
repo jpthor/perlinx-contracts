@@ -12,7 +12,6 @@ Allows Users to:
 2) Claim rewards for a certan reward era 
 3) Unlock Uniswap LP tokens
 
-
 ### Admin Functions
 ```solidity
 function updateConstants(uint rewardWeeks) public onlyAdmin
