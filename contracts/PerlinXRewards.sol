@@ -47,22 +47,24 @@ contract PerlinXRewards {
   address public PERL;
   uint public WEEKS;
   uint public TOTALREWARD;
-  uint public TIME;
   uint public poolCount;
-  uint public eraCount;
+  uint public currentWeek;
 
   mapping(address => bool) public poolIsListed;
   mapping(address => bool) public poolWasListed;
-  mapping(address => uint) public balancePool;
-  mapping(uint => uint) public mapEra_Total;
-  mapping(uint => mapping(address => uint)) public mapEraPool_Balance;
-  mapping(uint => mapping(address => uint)) public mapEraPool_Share;
+  // mapping(address => uint) public balancePool;
+  mapping(uint => uint) public mapWeek_Total;
+  mapping(uint => mapping(address => uint)) public mapWeekPool_Perls; // Perls in each pool
+  mapping(uint => mapping(address => uint)) public mapWeekPool_Share; // Share of reward for each pool
+  mapping(uint => mapping(address => uint)) public mapWeekPool_Balance; // Total LP tokens locked for each pool
 
   uint public memberCount;
   address[] public arrayMembers;
-  mapping(address => uint) public mapMember_timeLastLocked;
+  mapping(address => uint) public mapMember_blockLastLocked;
+  mapping(address => uint) public mapMember_weekLastLocked;
+  mapping(address => mapping(uint => mapping(address => uint))) public mapMemberWeekPool_Claim;
   mapping(address => mapping(address => uint)) public mapMemberPool_Balance;
-  mapping(address => mapping(uint => mapping(address => bool))) public mapMemberEraPool_hasClaimed;
+  mapping(address => mapping(uint => mapping(address => bool))) public mapMemberWeekPool_hasClaimed;
 
   // Only Admin can execute
     modifier onlyAdmin() {
@@ -73,8 +75,8 @@ contract PerlinXRewards {
   constructor(address perlin) public {
     perlinAdmin = msg.sender;
     PERL = perlin;
-    WEEKS = 11;
-    TIME =1;
+    WEEKS = 10;
+    currentWeek = 1;
   }
 
   //==============================ADMIN================================//
@@ -106,29 +108,32 @@ contract PerlinXRewards {
     poolCount -= 1;
   }
 
-  function snapshotPools(uint era) public onlyAdmin {
+// Snapshot a new Week
+ function snapshotPools() public onlyAdmin {
+    snapshotPoolsOnWeek(currentWeek);
+    currentWeek += 1;
+ }
+ // Use in anger re-snapshot a selected week
+  function snapshotPoolsOnWeek(uint week) public onlyAdmin {
     // First snapshot balances of each pool
-    if(era > eraCount){
-      eraCount += 1;
-    }
     uint perlTotal;
     for(uint i = 0; i<poolCount; i++){
       address pool = arrayPerlinPools[i];
       if(poolIsListed[pool]){
         uint perlBalance = ERC20(PERL).balanceOf(pool);
         perlTotal += perlBalance;
-        mapEraPool_Balance[era][pool] = perlBalance;
+        mapWeekPool_Perls[week][pool] = perlBalance;
       }
     }
-    mapEra_Total[era] = perlTotal;
+    mapWeek_Total[week] = perlTotal;
     // Then snapshot share of the reward for the week
     uint amount = getShare(1, WEEKS, TOTALREWARD);
     for(uint i = 0; i<poolCount; i++){
       address pool = arrayPerlinPools[i];
       if(poolIsListed[pool]){
-        uint part = mapEraPool_Balance[era][pool];
-        uint total = mapEra_Total[era];
-        mapEraPool_Share[era][pool] = getShare(part, total, amount);
+        uint part = mapWeekPool_Perls[week][pool];
+        uint total = mapWeek_Total[week];
+        mapWeekPool_Share[week][pool] = getShare(part, total, amount);
       }
     }
     // Note, due to EVM gas limits, poolCount should be less than 100 to do this
@@ -137,10 +142,11 @@ contract PerlinXRewards {
   //==============================USER================================//
   function lock(address pool, uint amount) public {
     require(poolIsListed[pool] == true, "Must be listed");
-    mapMember_timeLastLocked[msg.sender] = now;
+    mapMember_blockLastLocked[msg.sender] = block.number;             // Prevents flash-attacks
+    mapMemberPool_Balance[msg.sender][pool] += amount;                // Record total pool balance for member
+    mapWeekPool_Balance[currentWeek][pool] += amount;                 // Record total pool balance in week
+    registerClaimInCurrentWeek(pool);
     ERC20(pool).transferFrom(msg.sender, address(this), amount);
-    balancePool[pool] += amount;
-    mapMemberPool_Balance[msg.sender][pool] += amount;
   }
 
    function unlock(address pool) public {
@@ -148,27 +154,41 @@ contract PerlinXRewards {
     safetyCheck(msg.sender);
     if(balance > 0){
       ERC20(pool).transfer(msg.sender, balance);
-      balancePool[pool] = balancePool[pool].sub(balance);
       mapMemberPool_Balance[msg.sender][pool] = 0;
     }
   }
 
-  function claim(uint era, address pool) public {
-    require(mapMemberEraPool_hasClaimed[msg.sender][era][pool] == false, "Must not have claimed");
+  function claim(uint week, address pool) public {
+    require(mapMemberWeekPool_hasClaimed[msg.sender][week][pool] == false, "Must not have claimed");
+    require(mapMemberPool_Balance[msg.sender][pool] > 0, "Must still be member in pool");
     safetyCheck(msg.sender);
-    uint poolShare = mapEraPool_Share[era][pool];
-    uint balanceOfMember = mapMemberPool_Balance[msg.sender][pool];
-    uint totalBalance = balancePool[pool];
-    uint claimShare = getShare(balanceOfMember, totalBalance, poolShare);
-    mapMemberEraPool_hasClaimed[msg.sender][era][pool] = true;
+    registerClaimInCurrentWeek(pool);
+    uint claimShare = checkClaim(msg.sender, week, pool);
+    mapMemberWeekPool_hasClaimed[msg.sender][week][pool] = true;
     ERC20(PERL).transfer(msg.sender, claimShare);
   }
 
+  function registerClaimInCurrentWeek(address pool) public {
+    mapMemberWeekPool_Claim[msg.sender][currentWeek][pool] = mapMemberPool_Balance[msg.sender][pool];
+  }
+
+  function checkClaim(address member, uint week, address pool) public view returns (uint claimShare){
+    uint poolShare = mapWeekPool_Share[week][pool];
+    uint memberClaimInWeek = mapMemberWeekPool_Claim[member][week][pool];
+    uint totalBalInWeek = mapWeekPool_Balance[week][pool];
+    if(totalBalInWeek > 0){
+      claimShare = getShare(memberClaimInWeek, totalBalInWeek, poolShare);
+    } else {
+      claimShare = 0;
+    }
+    return claimShare;
+  }
+
   //==============================UTILS================================//
-  function getShare(uint part, uint total, uint amount) public returns (uint){
+  function getShare(uint part, uint total, uint amount) public pure returns (uint share){
       return (amount.mul(part)).div(total);
   }
   function safetyCheck(address _member) internal view {
-    require(mapMember_timeLastLocked[_member] <= now.sub(TIME), "Must be old enough");
+    require(mapMember_blockLastLocked[_member] < block.number, "Must be in previous block");
   }
 }

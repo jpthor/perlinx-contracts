@@ -13,9 +13,9 @@ var acc0; var acc1; var acc2;
 var perlin; var perlinX; var lp1; var lp2;
 var accounts;
 
-const REWARD = '172200000000000000000000'
-const BALANCE = '100000000000000000000'
-const BAL = '10000000000000000000'
+const REWARD = '172200000000000000000000' // 1200
+const LP_BAL = '100000000000000000000' // 100
+const PERL_BAL = '10000000000000000000' // 10
 
 before(async function() {
   accounts = await ethers.getSigners();
@@ -26,16 +26,16 @@ before(async function() {
   perlinX = await PerlinX.new(perlin.address);
   lp1 = await LP1.new();
   lp2 = await LP2.new();
-  await perlin.transfer(lp1.address, BAL)
-  await perlin.transfer(lp2.address, BAL)
-  await lp1.transfer(acc1, BALANCE)
-  await lp2.transfer(acc2, BALANCE)
+  await perlin.transfer(lp1.address, PERL_BAL)
+  await perlin.transfer(lp2.address, PERL_BAL)
+  await lp1.transfer(acc1, LP_BAL)
+  await lp2.transfer(acc2, LP_BAL)
 })
 
 describe("PerlinXRewards", function() {
   it("Should deploy", async function() {
     expect(await perlinX.PERL()).to.equal(perlin.address);
-    expect(BN2Str(await perlinX.WEEKS())).to.equal('11');
+    expect(BN2Str(await perlinX.WEEKS())).to.equal('10');
   });
   it("Update Constants", async function() {
     await perlinX.updateConstants('12');
@@ -51,6 +51,11 @@ describe("PerlinXRewards", function() {
   it("removeReward", async function() {
     await perlinX.removeReward('100000000000000000000');
     expect(BN2Str(await perlinX.TOTALREWARD())).to.equal('172100000000000000000000');
+  });
+  it("addReward again", async function() {
+    await perlin.approve(perlinX.address, REWARD)
+    await perlinX.addReward('100000000000000000000');
+    expect(BN2Str(await perlinX.TOTALREWARD())).to.equal(REWARD);
   });
   it("listPool", async function() {
     await perlinX.listPool(lp1.address);
@@ -75,38 +80,47 @@ describe("PerlinXRewards", function() {
     expect(await perlinX.arrayPerlinPools(1)).to.equal(lp2.address);
   });
   it("Users Locks LP1", async function() {
-    await lp1.approve(perlinX.address, BALANCE, {from:acc1})
-    await perlinX.lock(lp1.address, BALANCE, {from:acc1});
-    expect(BN2Str(await perlinX.balancePool(lp1.address))).to.equal(BALANCE);
-    expect(BN2Str(await perlinX.mapMemberPool_Balance(acc1, lp1.address))).to.equal(BALANCE);
+    await lp1.approve(perlinX.address, LP_BAL, {from:acc1})
+    await perlinX.lock(lp1.address, LP_BAL, {from:acc1});
+    expect(BN2Str(await lp1.balanceOf(perlinX.address))).to.equal(LP_BAL);
+    expect(BN2Str(await perlinX.mapMemberPool_Balance(acc1, lp1.address))).to.equal(LP_BAL);
   });
   it("Users Locks LP2", async function() {
-    await lp2.approve(perlinX.address, BALANCE, {from:acc2})
-    await perlinX.lock(lp2.address, BALANCE, {from:acc2});
-    expect(BN2Str(await perlinX.balancePool(lp2.address))).to.equal(BALANCE);
-    expect(BN2Str(await perlinX.mapMemberPool_Balance(acc2, lp2.address))).to.equal(BALANCE);
+    await lp2.approve(perlinX.address, LP_BAL, {from:acc2})
+    await perlinX.lock(lp2.address, LP_BAL, {from:acc2});
+    expect(BN2Str(await lp2.balanceOf(perlinX.address))).to.equal(LP_BAL);
+    expect(BN2Str(await perlinX.mapMemberPool_Balance(acc2, lp2.address))).to.equal(LP_BAL);
   });
   it("Admin Snapshots", async function() {
-    await perlinX.snapshotPools('1');
-    expect(BN2Str(await perlinX.mapEraPool_Balance('1', lp1.address))).to.equal(BAL);
-    expect(BN2Str(await perlinX.mapEra_Total('1'))).to.equal('20000000000000000000');
-    let share = '7170833333333333333333'
-    expect(BN2Str(await perlinX.mapEraPool_Share('1', lp1.address))).to.equal(share);
+    await perlinX.snapshotPools();
+    expect(BN2Str(await perlinX.mapWeekPool_Perls('1', lp1.address))).to.equal(PERL_BAL);
+    expect(BN2Str(await perlinX.mapWeek_Total('1'))).to.equal('20000000000000000000');
+    expect(BN2Str(await perlinX.mapWeekPool_Share('1', lp1.address))).to.equal('7175000000000000000000');
+  });
+  it("Users checks", async function() {
+    let mapWeekPool_Share = BN2Str(await perlinX.mapWeekPool_Share('1', lp1.address))
+    let mapMemberWeekPool_Claim = BN2Str(await perlinX.mapMemberWeekPool_Claim(acc1, '1', lp1.address))
+    let mapWeekPool_Balance = BN2Str(await perlinX.mapWeekPool_Balance('1', lp1.address))
+    // console.log('mapWeekPool_Share', mapWeekPool_Share)
+    // console.log('mapMemberWeekPool_Claim', mapMemberWeekPool_Claim)
+    // console.log('mapWeekPool_Balance', mapWeekPool_Balance)
+    expect(BN2Str(await perlinX.getShare(mapMemberWeekPool_Claim, mapWeekPool_Balance, mapWeekPool_Share))).to.equal('7175000000000000000000');
+    expect(BN2Str(await perlinX.checkClaim(acc1, '1', lp1.address))).to.equal('7175000000000000000000');
   });
   it("Users claims", async function() {
     await perlinX.claim('1', lp1.address, {from:acc1});
-    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('164929166666666666666667');
-    expect(BN2Str(await perlin.balanceOf(acc1))).to.equal('7170833333333333333333');
+    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('165025000000000000000000');
+    expect(BN2Str(await perlin.balanceOf(acc1))).to.equal('7175000000000000000000');
     await perlinX.claim('1', lp2.address, {from:acc2});
-    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('157758333333333333333334');
-    expect(BN2Str(await perlin.balanceOf(acc2))).to.equal('7170833333333333333333');
+    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('157850000000000000000000');
+    expect(BN2Str(await perlin.balanceOf(acc2))).to.equal('7175000000000000000000');
   });
   it("Users unlocks", async function() {
     await perlinX.unlock(lp1.address, {from:acc1});
     expect(BN2Str(await lp1.balanceOf(perlinX.address))).to.equal('0');
-    expect(BN2Str(await lp1.balanceOf(acc1))).to.equal(BALANCE);
+    expect(BN2Str(await lp1.balanceOf(acc1))).to.equal(LP_BAL);
     await perlinX.unlock(lp2.address, {from:acc2});
     expect(BN2Str(await lp2.balanceOf(perlinX.address))).to.equal('0');
-    expect(BN2Str(await lp2.balanceOf(acc2))).to.equal(BALANCE);
+    expect(BN2Str(await lp2.balanceOf(acc2))).to.equal(LP_BAL);
   });
 });
