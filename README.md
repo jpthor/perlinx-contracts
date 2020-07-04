@@ -19,7 +19,9 @@ function addReward(uint amount) public onlyAdmin
 function removeReward(uint amount)  public onlyAdmin
 function listPool(address pool) public onlyAdmin
 function delistPool(address pool) public onlyAdmin
+function transferAdmin(address newAdmin) public onlyAdmin
 function snapshotPools(uint era) public onlyAdmin
+function snapshotPoolsOnWeek(uint week) public onlyAdmin
 ```
 
 
@@ -28,6 +30,8 @@ function snapshotPools(uint era) public onlyAdmin
 function lock(address pool, uint amount) public
 function unlock(address pool) public
 function claim(uint era, address pool) public
+function registerClaimInCurrentWeek(address pool) public
+function checkClaim(address member, uint week, address pool) public view returns (uint claimShare)
 ```
 
 
