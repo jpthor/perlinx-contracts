@@ -52,7 +52,6 @@ contract PerlinXRewards {
 
   mapping(address => bool) public poolIsListed;
   mapping(address => bool) public poolWasListed;
-  // mapping(address => uint) public balancePool;
   mapping(uint => uint) public mapWeek_Total;
   mapping(uint => mapping(address => uint)) public mapWeekPool_Perls; // Perls in each pool
   mapping(uint => mapping(address => uint)) public mapWeekPool_Share; // Share of reward for each pool
@@ -106,6 +105,9 @@ contract PerlinXRewards {
   function delistPool(address pool) public onlyAdmin {
     poolIsListed[pool] = false;
     poolCount -= 1;
+  }
+  function transferAdmin(address newAdmin) public onlyAdmin {
+    perlinAdmin = newAdmin;
   }
 
 // Snapshot a new Week
