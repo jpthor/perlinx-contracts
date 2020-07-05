@@ -41,3 +41,10 @@ function checkClaim(address member, uint week, address pool) public view returns
 yarn
 npx buidler test
 ```
+
+
+
+perlin deployed to: 0x7c2C195CD6D34B8F845992d380aADB2730bB9C6F
+perlinX deployed to: 0x8858eeB3DfffA017D4BCE9801D340D36Cf895CCf
+lp1 deployed to: 0x0078371BDeDE8aAc7DeBfFf451B74c5EDB385Af7
+lp2 deployed to: 0xf4e77E5Da47AC3125140c470c71cBca77B5c638c
