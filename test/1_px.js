@@ -196,10 +196,79 @@ describe("PerlinXRewards", function() {
     expect(BN2Str(await perlin.balanceOf(acc2))).to.equal('24395000000000000000000');
   });
 
-  it("Users unlocks", async function() {
+  it("User 1 unlocks", async function() {
     await perlinX.unlock(lp1.address, {from:acc1});
     expect(BN2Str(await lp1.balanceOf(perlinX.address))).to.equal('100000000000000000000');
     expect(BN2Str(await lp1.balanceOf(acc1))).to.equal(LP_BAL);
+  });
+  it("Admin Snapshots", async function() {
+    await perlinX.snapshotPools();
+    expect(BN2Str(await perlinX.mapWeekPool_Weight('4', lp1.address))).to.equal(PERL_BAL);
+    expect(BN2Str(await perlinX.mapWeekPool_Weight('4', lp2.address))).to.equal(PERL_BAL4);
+    expect(BN2Str(await perlinX.mapWeek_Total('4'))).to.equal('50000000000000000000');
+    expect(BN2Str(await perlinX.mapWeekPool_Share('4', lp1.address))).to.equal('2870000000000000000000');
+    expect(BN2Str(await perlinX.mapWeekPool_Share('4', lp2.address))).to.equal('11480000000000000000000');
+  });
+  it("Users checks", async function() {
+    let mapWeekPool_Share = BN2Str(await perlinX.mapWeekPool_Share('4', lp1.address))
+    let mapMemberWeekPool_Claim = BN2Str(await perlinX.mapMemberWeekPool_Claim(acc1, '4', lp1.address))
+    let mapWeekPool_Balance = BN2Str(await perlinX.mapWeekPool_Claims('4', lp1.address))
+    expect(BN2Str(await perlinX.getShare(mapMemberWeekPool_Claim, mapWeekPool_Balance, mapWeekPool_Share))).to.equal('1435000000000000000000');
+    expect(BN2Str(await perlinX.checkClaimInPool(acc1, '4', lp1.address))).to.equal('1435000000000000000000');
+    expect(BN2Str(await perlinX.checkClaimInPool(acc2, '4', lp1.address))).to.equal('1435000000000000000000');
+    expect(BN2Str(await perlinX.checkClaimInPool(acc2, '4', lp2.address))).to.equal('11480000000000000000000');
+    expect(BN2Str(await perlinX.checkClaim(acc1, '4'))).to.equal('1435000000000000000000');
+    expect(BN2Str(await perlinX.checkClaim(acc2, '4'))).to.equal('12915000000000000000000');
+  });
+  it("Users claims", async function() {
+    await perlinX.claim('4', {from:acc1});
+    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('127715000000000000000000');
+    expect(BN2Str(await perlin.balanceOf(acc1))).to.equal('20090000000000000000000');
+    await perlinX.claim('4', {from:acc2});
+    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('114800000000000000000000');
+    expect(BN2Str(await perlin.balanceOf(acc2))).to.equal('37310000000000000000000');
+  });
+  it("Admin Snapshots", async function() {
+    await perlinX.snapshotPools();
+    expect(BN2Str(await perlinX.mapWeekPool_Weight('5', lp1.address))).to.equal(PERL_BAL);
+    expect(BN2Str(await perlinX.mapWeekPool_Weight('5', lp2.address))).to.equal(PERL_BAL4);
+    expect(BN2Str(await perlinX.mapWeek_Total('5'))).to.equal('50000000000000000000');
+    expect(BN2Str(await perlinX.mapWeekPool_Share('5', lp1.address))).to.equal('2870000000000000000000');
+    expect(BN2Str(await perlinX.mapWeekPool_Share('5', lp2.address))).to.equal('11480000000000000000000');
+  });
+  it("Users checks", async function() {
+    let mapWeekPool_Share = BN2Str(await perlinX.mapWeekPool_Share('5', lp1.address))
+    let mapMemberWeekPool_Claim = BN2Str(await perlinX.mapMemberWeekPool_Claim(acc1, '5', lp1.address))
+    let mapWeekPool_Balance = BN2Str(await perlinX.mapWeekPool_Claims('5', lp1.address))
+    expect(BN2Str(await perlinX.getShare(mapMemberWeekPool_Claim, mapWeekPool_Balance, mapWeekPool_Share))).to.equal('0');
+    expect(BN2Str(await perlinX.checkClaimInPool(acc1, '5', lp1.address))).to.equal('0');
+    expect(BN2Str(await perlinX.checkClaimInPool(acc2, '5', lp1.address))).to.equal('2870000000000000000000');
+    expect(BN2Str(await perlinX.checkClaimInPool(acc2, '5', lp2.address))).to.equal('11480000000000000000000');
+    expect(BN2Str(await perlinX.checkClaim(acc1, '5'))).to.equal('0');
+    expect(BN2Str(await perlinX.checkClaim(acc2, '5'))).to.equal('14350000000000000000000');
+  });
+  it("Users claims", async function() {
+    await perlinX.claim('5', {from:acc1});
+    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('114800000000000000000000');
+    expect(BN2Str(await perlin.balanceOf(acc1))).to.equal('20090000000000000000000');
+    await perlinX.claim('5', {from:acc2});
+    expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('100450000000000000000000');
+    expect(BN2Str(await perlin.balanceOf(acc2))).to.equal('51660000000000000000000');
+  });
+  it("Admin Snapshots, User Claims", async function() {
+    let bal = getBN('51660000000000000000000')
+    let claim = getBN('14350000000000000000000')
+    // claim = startBal.plus(claim) 
+    for(let i = 6; i<13; i++){
+      bal = bal.plus(claim) 
+      await perlinX.snapshotPools();
+      await perlinX.claim(i, {from:acc2});
+      expect(BN2Str(await perlin.balanceOf(acc2))).to.equal(BN2Str(bal));
+    }
+    await perlinX.snapshotPools();
+    await truffleAssert.reverts(perlinX.claim(13, {from:acc2}))
+  });
+  it("User 2 unlocks", async function() {
     await perlinX.unlock(lp1.address, {from:acc2});
     expect(BN2Str(await lp1.balanceOf(perlinX.address))).to.equal('0');
     expect(BN2Str(await lp1.balanceOf(acc2))).to.equal(LP_BAL);
