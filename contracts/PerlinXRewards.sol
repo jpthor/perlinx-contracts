@@ -51,7 +51,7 @@ contract PerlinXRewards {
   uint public currentWeek;
 
   mapping(address => bool) public poolIsListed;       // Tracks current listing status
-  mapping(address => bool) public poolIsStaked;       // Tracks current staking status
+  mapping(address => bool) public poolIsLocked;       // Tracks current staking status
   mapping(address => bool) public poolWasListed;      // Tracks if pool was ever listed
   mapping(address => uint) public poolFactor;         // Allows a reward factor to be applied; 100 = 1.0
   mapping(uint => uint) public mapWeek_Total;         // Total PERL staked in each week
@@ -137,7 +137,7 @@ contract PerlinXRewards {
     uint perlTotal;
     for(uint i = 0; i<poolCount; i++){
       address pool = arrayPerlinPools[i];
-      if(poolIsListed[pool] && poolIsStaked[pool]){
+      if(poolIsListed[pool] && poolIsLocked[pool]){
         uint factor = poolFactor[pool];
         uint perlBalance = (ERC20(PERL).balanceOf(pool).mul(factor)).div(100);  // (depth * factor) / 100
         perlTotal += perlBalance;
@@ -149,7 +149,7 @@ contract PerlinXRewards {
     uint rewardForWeek = getRewardForWeek();
     for(uint i = 0; i<poolCount; i++){
       address pool = arrayPerlinPools[i];
-      if(poolIsListed[pool] && poolIsStaked[pool]){
+      if(poolIsListed[pool] && poolIsLocked[pool]){
         uint part = mapWeekPool_Weight[week][pool];
         uint total = mapWeek_Total[week];
         mapWeekPool_Share[week][pool] = getShare(part, total, rewardForWeek);
@@ -169,8 +169,8 @@ contract PerlinXRewards {
       arrayMembers.push(msg.sender);
       isMember[msg.sender] = true;
     }
-    if(!poolIsStaked[pool]){
-      poolIsStaked[pool] = true;
+    if(!poolIsLocked[pool]){
+      poolIsLocked[pool] = true;
     }
     if(!mapMemberPool_Added[msg.sender][pool]){                       // Record all the pools member is in
       mapMember_poolCount[msg.sender] += 1;
@@ -200,7 +200,7 @@ contract PerlinXRewards {
       ERC20(pool).transfer(msg.sender, balance);        // Then transfer
     }
     if(ERC20(pool).balanceOf(address(this)) == 0){
-      poolIsStaked[pool] = false;                       // If nobody is staking any more
+      poolIsLocked[pool] = false;                       // If nobody is staking any more
     }
   }
 
