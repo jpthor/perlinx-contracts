@@ -61,7 +61,7 @@ library SafeMath {
 }
 
 // Token Contract
-contract Exchange1 is ERC20 {
+contract PAIR is ERC20 {
 
     using SafeMath for uint256;
 
@@ -70,6 +70,9 @@ contract Exchange1 is ERC20 {
     string public symbol;                                       // Symbol of Coin
     uint256 public decimals  = 18;                              // Decimals
     uint256 public override totalSupply  = 1000000 * (10 ** decimals);   // 1,000,000 Total
+
+    address public token0;
+    address public token1;
 
     // Mapping
     mapping(address => uint256) public override balanceOf;                          // Map balanceOf
@@ -80,11 +83,17 @@ contract Exchange1 is ERC20 {
     event Transfer(address indexed from, address indexed to, uint256 value);    // ERC20
 
     // Minting event
-    constructor() public{
+    constructor(address pair) public{
+        token0 = pair;
         balanceOf[msg.sender] = totalSupply;
-        name = "Token1";
-        symbol  = "TKN1";
+        name = "Uniswap-V2";
+        symbol  = "UNI-V2";
         emit Transfer(address(0), msg.sender, totalSupply);
+    }
+
+    function setToken1(address token) public returns (bool success) {
+        token1 = token;
+        return true;
     }
     
     // ERC20

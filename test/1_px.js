@@ -1,8 +1,10 @@
 const { expect } = require("chai");
 const Perlin = artifacts.require("Token");
 const PerlinX = artifacts.require("PerlinXRewards");
-const LP1 = artifacts.require("Token");
-const LP2 = artifacts.require("Token");
+const TOKEN1 = artifacts.require("Token");
+const TOKEN2 = artifacts.require("Token");
+const LP1 = artifacts.require("PAIR");
+const LP2 = artifacts.require("PAIR");
 const BigNumber = require('bignumber.js')
 const truffleAssert = require('truffle-assertions')
 
@@ -10,7 +12,7 @@ function BN2Str(BN) { return ((new BigNumber(BN)).toFixed()) }
 function getBN(BN) { return (new BigNumber(BN)) }
 
 var acc0; var acc1; var acc2;
-var perlin; var perlinX; var lp1; var lp2;
+var perlin; var perlinX; var token1; var token2; var lp1; var lp2;
 var accounts;
 
 const REWARD = '172200000000000000000000' // 1200
@@ -26,10 +28,17 @@ before(async function() {
   acc0 = await accounts[0].getAddress()
   acc1 = await accounts[1].getAddress()
   acc2 = await accounts[2].getAddress()
+
   perlin = await Perlin.new();
   perlinX = await PerlinX.new(perlin.address);
-  lp1 = await LP1.new();
-  lp2 = await LP2.new();
+  token1 = await TOKEN1.new();
+  token2 = await TOKEN2.new();
+
+  lp1 = await LP1.new(perlin.address);
+  await lp1.setToken1(token1.address);
+  lp2 = await LP2.new(token2.address);
+  await lp2.setToken1(perlin.address);
+
   await perlin.transfer(lp1.address, PERL_BAL)
   await perlin.transfer(lp2.address, PERL_BAL2)
   await lp1.transfer(acc1, LP_BAL)
@@ -40,22 +49,18 @@ before(async function() {
 describe("PerlinXRewards", function() {
   it("Should deploy", async function() {
     expect(await perlinX.PERL()).to.equal(perlin.address);
-    expect(BN2Str(await perlinX.WEEKS())).to.equal('10');
-  });
-  it("Update Constants", async function() {
-    await perlinX.updateConstants('12');
-    expect(BN2Str(await perlinX.WEEKS())).to.equal('12');
   });
   it("addReward", async function() {
     await perlin.approve(perlinX.address, REWARD)
     expect(BN2Str(await perlin.allowance(acc0, perlinX.address))).to.equal(REWARD)
     await perlinX.addReward(REWARD);
-    // expect(BN2Str(await perlinX.TOTALREWARD())).to.equal(REWARD);
+    expect(BN2Str(await perlinX.TOTALREWARDS())).to.equal(REWARD);
     expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal(REWARD);
+
   });
   it("removeReward", async function() {
     await perlinX.removeReward('100000000000000000000');
-    // expect(BN2Str(await perlinX.TOTALREWARD())).to.equal('172100000000000000000000');
+    expect(BN2Str(await perlinX.TOTALREWARDS())).to.equal('172100000000000000000000');
     expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal('172100000000000000000000');
   });
   it("addReward again", async function() {
@@ -64,11 +69,11 @@ describe("PerlinXRewards", function() {
     expect(BN2Str(await perlin.balanceOf(perlinX.address))).to.equal(REWARD);
   });
   it("listPool", async function() {
-    await perlinX.listPool(lp1.address, '100');
+    await perlinX.listPool(lp1.address, token1.address, '100');
     expect(await perlinX.poolIsListed(lp1.address)).to.equal(true);
     expect(BN2Str(await perlinX.poolCount())).to.equal('1');
     expect(await perlinX.arrayPerlinPools(0)).to.equal(lp1.address);
-    expect(BN2Str(await perlinX.poolFactor(lp1.address))).to.equal('100');
+    expect(BN2Str(await perlinX.poolWeight(lp1.address))).to.equal('100');
   });
   it("delistPool", async function() {
     await perlinX.delistPool(lp1.address);
@@ -77,16 +82,17 @@ describe("PerlinXRewards", function() {
     expect(await perlinX.arrayPerlinPools(0)).to.equal(lp1.address);
   });
   it("listPool again", async function() {
-    await perlinX.listPool(lp1.address, '100');
+    await perlinX.listPool(lp1.address, token1.address, '100');
     expect(await perlinX.poolIsListed(lp1.address)).to.equal(true);
     expect(BN2Str(await perlinX.poolCount())).to.equal('1');
     expect(await perlinX.arrayPerlinPools(0)).to.equal(lp1.address);
-    expect(BN2Str(await perlinX.poolFactor(lp1.address))).to.equal('100');
-    await perlinX.listPool(lp2.address, '200');
+    expect(BN2Str(await perlinX.poolWeight(lp1.address))).to.equal('100');
+    
+    await perlinX.listPool(lp2.address, token2.address, '200');
     expect(await perlinX.poolIsListed(lp2.address)).to.equal(true);
     expect(BN2Str(await perlinX.poolCount())).to.equal('2');
     expect(await perlinX.arrayPerlinPools(1)).to.equal(lp2.address);
-    expect(BN2Str(await perlinX.poolFactor(lp2.address))).to.equal('200');
+    expect(BN2Str(await perlinX.poolWeight(lp2.address))).to.equal('200');
   });
   // 1 User, 1 Pool
   it("Users Locks LP1", async function() {
@@ -96,7 +102,7 @@ describe("PerlinXRewards", function() {
     expect(BN2Str(await perlinX.mapMemberPool_Balance(acc1, lp1.address))).to.equal(LP_BAL);
   });
   it("Admin Snapshots", async function() {
-    await perlinX.snapshotPools();
+    await perlinX.snapshotPools('14350000000000000000000');
     expect(BN2Str(await perlinX.mapWeekPool_Weight('1', lp1.address))).to.equal(PERL_BAL);
     expect(BN2Str(await perlinX.mapWeek_Total('1'))).to.equal('10000000000000000000');
     expect(BN2Str(await perlinX.mapWeekPool_Share('1', lp1.address))).to.equal('14350000000000000000000');
@@ -131,7 +137,7 @@ describe("PerlinXRewards", function() {
     expect(BN2Str(await perlinX.mapMemberPool_Balance(acc2, lp2.address))).to.equal(LP_BAL);
   });
   it("Admin Snapshots", async function() {
-    await perlinX.snapshotPools();
+    await perlinX.snapshotPools('14350000000000000000000');
     expect(BN2Str(await perlinX.mapWeekPool_Weight('2', lp1.address))).to.equal(PERL_BAL);
     expect(BN2Str(await perlinX.mapWeek_Total('2'))).to.equal('50000000000000000000');
     expect(BN2Str(await perlinX.mapWeekPool_Share('2', lp1.address))).to.equal('2870000000000000000000');
@@ -169,7 +175,7 @@ describe("PerlinXRewards", function() {
     expect(BN2Str(await perlinX.mapMemberWeekPool_Claim(acc2, '3', lp2.address))).to.equal(LP_BAL);
   });
   it("Admin Snapshots", async function() {
-    await perlinX.snapshotPools();
+    await perlinX.snapshotPools('14350000000000000000000');
     expect(BN2Str(await perlinX.mapWeekPool_Weight('3', lp1.address))).to.equal(PERL_BAL);
     expect(BN2Str(await perlinX.mapWeekPool_Weight('3', lp2.address))).to.equal(PERL_BAL4);
     expect(BN2Str(await perlinX.mapWeek_Total('3'))).to.equal('50000000000000000000');
@@ -202,7 +208,7 @@ describe("PerlinXRewards", function() {
     expect(BN2Str(await lp1.balanceOf(acc1))).to.equal(LP_BAL);
   });
   it("Admin Snapshots", async function() {
-    await perlinX.snapshotPools();
+    await perlinX.snapshotPools('14350000000000000000000');
     expect(BN2Str(await perlinX.mapWeekPool_Weight('4', lp1.address))).to.equal(PERL_BAL);
     expect(BN2Str(await perlinX.mapWeekPool_Weight('4', lp2.address))).to.equal(PERL_BAL4);
     expect(BN2Str(await perlinX.mapWeek_Total('4'))).to.equal('50000000000000000000');
@@ -229,7 +235,7 @@ describe("PerlinXRewards", function() {
     expect(BN2Str(await perlin.balanceOf(acc2))).to.equal('37310000000000000000000');
   });
   it("Admin Snapshots", async function() {
-    await perlinX.snapshotPools();
+    await perlinX.snapshotPools('14350000000000000000000');
     expect(BN2Str(await perlinX.mapWeekPool_Weight('5', lp1.address))).to.equal(PERL_BAL);
     expect(BN2Str(await perlinX.mapWeekPool_Weight('5', lp2.address))).to.equal(PERL_BAL4);
     expect(BN2Str(await perlinX.mapWeek_Total('5'))).to.equal('50000000000000000000');
@@ -261,12 +267,11 @@ describe("PerlinXRewards", function() {
     // claim = startBal.plus(claim) 
     for(let i = 6; i<13; i++){
       bal = bal.plus(claim) 
-      await perlinX.snapshotPools();
+      await perlinX.snapshotPools('14350000000000000000000');
       await perlinX.claim(i, {from:acc2});
       expect(BN2Str(await perlin.balanceOf(acc2))).to.equal(BN2Str(bal));
     }
-    await perlinX.snapshotPools();
-    await truffleAssert.reverts(perlinX.claim(13, {from:acc2}))
+    await truffleAssert.reverts(perlinX.snapshotPools('14350000000000000000000'), "Must be less than available");
   });
   it("User 2 unlocks", async function() {
     await perlinX.unlock(lp1.address, {from:acc2});
