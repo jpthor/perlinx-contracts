@@ -147,9 +147,9 @@ contract PerlinXRewards {
   // Lists a pool and its non-PERL asset
   function listPool(address pool, address asset, uint weight) public onlyAdmin {
     require((UNISWAP(pool).token0() == PERL || UNISWAP(pool).token1() == PERL), "Must be PERL pool");
-    require((UNISWAP(pool).token0() == asset || UNISWAP(pool).token1() == asset), "Must also have asset");
+    require((UNISWAP(pool).token0() == asset || UNISWAP(pool).token1() == asset), "Must also have asset in pool");
     require(asset != PERL, "Must not be PERL");
-    require(weight > 1 && weight < 1000, "Must be greater than 0.1, less than 10");
+    require(weight >= 1 && weight <= 1000, "Must be greater than 0.1, less than 10");
     if(!poolWasListed[pool]){
       arrayPerlinPools.push(pool);
       poolCount += 1;
