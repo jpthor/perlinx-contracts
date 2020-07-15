@@ -52,7 +52,8 @@ contract PerlinXRewards {
   using SafeMath for uint;
 
   address public PERL;
-
+  address[] public arrayAdmins;
+  uint public adminCount;
   address[] public arrayPerlinPools;
   uint public poolCount;
   address[] public arraySynths;
@@ -114,8 +115,10 @@ contract PerlinXRewards {
     }
 
   constructor(address perlin) public {
+    arrayAdmins.push(msg.sender);
+    adminCount = 1;
     isAdmin[msg.sender] = true;
-    PERL = perlin; //0xBEb8BE6b3E1051a50487517024263119F917cF88;
+    PERL = perlin; //0xB7b9568073C9e745acD84eEb30F1c32F74Ba4946;
     currentWeek = 1;
   }
   //==============================ADMIN================================//
@@ -166,11 +169,13 @@ contract PerlinXRewards {
   }
 
   function addAdmin(address newAdmin) public onlyAdmin {
-    isAdmin[newAdmin] == true;
+    arrayAdmins.push(newAdmin);
+    adminCount += 1;
+    isAdmin[newAdmin] = true;
   }
   function transferAdmin(address newAdmin) public onlyAdmin {
-    isAdmin[newAdmin] == true;
-    isAdmin[msg.sender] == false;
+    isAdmin[newAdmin] = true;
+    isAdmin[msg.sender] = false;
   }
 
 // Snapshot a new Week
